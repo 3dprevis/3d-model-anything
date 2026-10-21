@@ -12,6 +12,8 @@ import { updateCameraDepth } from '../../../packages/room-runtime/camera-depth';
 import { setMaxAnisotropy } from '../../../packages/room-runtime/materials';
 import { applyRoomRendering, createPipeline, precompileRoomRendering } from '../../../packages/room-runtime/render';
 
+document.querySelector('.play-link')!.addEventListener('click', () => { location.href = appURL('play.html') + location.search; });
+
 const EYE_HEIGHT = 1.6;
 const WALK_SPEED = 1.5; // m/s
 const RUN_SPEED = 3.5;
@@ -666,4 +668,3 @@ updateCameraHelper();
 if (import.meta.env.DEV) Object.assign(window, { __viewer: { renderer, scene, camera, pipeline, orbit,
   get room() { return room; }, get stats() { return { renderedFrames, pendingFrame, movingRatio, quality }; } } });
 
-document.querySelector('.play-link')!.addEventListener('click', () => { location.href = appURL('play.html') + location.search; });
