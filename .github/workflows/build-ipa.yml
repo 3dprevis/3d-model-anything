@@ -40,7 +40,9 @@ jobs:
           rm -rf Payload HouseCapture-unsigned.ipa
           mkdir Payload
           cp -R "$APP_PATH" Payload/
-          ditto -c -k Payload HouseCapture-unsigned.ipa
+          # --keepParent is required: the zip root must contain Payload/HouseCapture.app,
+          # not the bare .app (a zip rooted at HouseCapture.app breaks Sideloadly).
+          ditto -c -k --keepParent Payload HouseCapture-unsigned.ipa
           ls -lh HouseCapture-unsigned.ipa
 
       - name: Verify IPA
@@ -48,10 +50,15 @@ jobs:
         run: |
           echo "== IPA structure =="
           unzip -l HouseCapture-unsigned.ipa
-          PLIST="build/Build/Products/Release-iphoneos/HouseCapture.app/Info.plist"
-          BID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$PLIST")
-          MINOS=$(/usr/libexec/PlistBuddy -c "Print MinimumOSVersion" "$PLIST")
-          SHARING=$(/usr/libexec/PlistBuddy -c "Print UIFileSharingEnabled" "$PLIST")
+          # Layout assertions on the zip itself: Payload/HouseCapture.app must be at the
+          # zip root, and the bare .app must NOT be.
+          unzip -l HouseCapture-unsigned.ipa | grep -q " Payload/HouseCapture.app/$"
+          ! unzip -l HouseCapture-unsigned.ipa | grep -q " HouseCapture.app/$"
+          # Plist is read from INSIDE the zip, not from the build directory.
+          unzip -p HouseCapture-unsigned.ipa Payload/HouseCapture.app/Info.plist > /tmp/IPA-Info.plist
+          BID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" /tmp/IPA-Info.plist)
+          MINOS=$(/usr/libexec/PlistBuddy -c "Print MinimumOSVersion" /tmp/IPA-Info.plist)
+          SHARING=$(/usr/libexec/PlistBuddy -c "Print UIFileSharingEnabled" /tmp/IPA-Info.plist)
           echo "CFBundleIdentifier: $BID"
           echo "MinimumOSVersion: $MINOS"
           echo "UIFileSharingEnabled: $SHARING"
