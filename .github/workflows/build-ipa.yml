@@ -1,0 +1,67 @@
+name: Build unsigned IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: apps/house-capture
+        run: xcodegen generate
+
+      - name: Build unsigned Release
+        working-directory: apps/house-capture
+        run: |
+          xcodebuild -project HouseCapture.xcodeproj -scheme HouseCapture \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        working-directory: apps/house-capture
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/HouseCapture.app"
+          test -d "$APP_PATH"
+          rm -rf Payload HouseCapture-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          ditto -c -k Payload HouseCapture-unsigned.ipa
+          ls -lh HouseCapture-unsigned.ipa
+
+      - name: Verify IPA
+        working-directory: apps/house-capture
+        run: |
+          echo "== IPA structure =="
+          unzip -l HouseCapture-unsigned.ipa
+          PLIST="build/Build/Products/Release-iphoneos/HouseCapture.app/Info.plist"
+          BID=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$PLIST")
+          MINOS=$(/usr/libexec/PlistBuddy -c "Print MinimumOSVersion" "$PLIST")
+          SHARING=$(/usr/libexec/PlistBuddy -c "Print UIFileSharingEnabled" "$PLIST")
+          echo "CFBundleIdentifier: $BID"
+          echo "MinimumOSVersion: $MINOS"
+          echo "UIFileSharingEnabled: $SHARING"
+          test "$BID" = "com.wesbos.housecapture"
+          test "$MINOS" = "17.0"
+          test "$SHARING" = "true"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HouseCapture-unsigned
+          path: apps/house-capture/HouseCapture-unsigned.ipa
+          retention-days: 7
